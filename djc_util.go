@@ -1,4 +1,4 @@
-package djc_util
+package djc_go_util
 
 import (
 	"fmt"
