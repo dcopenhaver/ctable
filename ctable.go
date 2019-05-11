@@ -1,4 +1,4 @@
-package djc_go_util
+package ctable
 
 import (
 	"fmt"
