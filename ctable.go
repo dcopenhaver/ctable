@@ -105,7 +105,7 @@ func (ct *ConsoleTable) Display(show_headers bool) {
 				format_string = just_code + strconv.Itoa(col.max_length) + "v"
 			}
 
-			row_str += " " + fmt.Sprintf(format_string, field_data)
+			row_str += fmt.Sprintf(format_string, field_data)
 		} // END for each column
 
 		processed_rows = append(processed_rows, row_str)
@@ -122,18 +122,18 @@ func (ct *ConsoleTable) Display(show_headers bool) {
 			// did we truncate? if so header needs to account for that
 			if col.truncation_required {
 
-				header_separator += " " + strings.Repeat("=", col.truncate_at+3) // +3 to account for the '...'
+				header_separator += strings.Repeat("=", col.truncate_at+3) // +3 to account for the '...'
 
 				// truncate column name also?
 				if utf8.RuneCountInString(col.Name) > col.truncate_at {
-					header_str += " " + fmt.Sprintf("%-"+strconv.Itoa(col.truncate_at+3)+"v", col.Name[:col.truncate_at]+"...")
+					header_str += fmt.Sprintf("%-"+strconv.Itoa(col.truncate_at+3)+"v", col.Name[:col.truncate_at]+"...")
 				} else {
-					header_str += " " + fmt.Sprintf("%-"+strconv.Itoa(col.truncate_at+3)+"v", col.Name)
+					header_str += fmt.Sprintf("%-"+strconv.Itoa(col.truncate_at+3)+"v", col.Name)
 				}
 
 			} else {
-				header_str += " " + fmt.Sprintf("%-"+strconv.Itoa(col.max_length)+"v", col.Name)
-				header_separator += " " + strings.Repeat("=", col.max_length)
+				header_str += fmt.Sprintf("%-"+strconv.Itoa(col.max_length)+"v", col.Name)
+				header_separator += strings.Repeat("=", col.max_length)
 			}
 		}
 		// output header
