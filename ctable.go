@@ -8,39 +8,39 @@ import (
 	"unicode/utf8"
 )
 
-type ConsoleTableColumn struct {
-	Name                string
-	truncate_at         int
-	Justification       string
-	truncation_required bool
-	max_length          int
+type Column struct {
+	Name               string
+	truncateAt         int
+	Justification      string
+	truncationRequired bool
+	maxLength          int
 }
 
-func NewConsoleTableColumn(name string, truncate_at int) ConsoleTableColumn {
+func NewColumn(name string, truncateAt int) Column {
 
 	/*
 		truncation and max length related items need to inlude the column name value as well,
 		because the column names are a part of the data set when it comes to display logic
 	*/
 
-	return ConsoleTableColumn{
-		Name:                name,
-		truncate_at:         truncate_at,
-		Justification:       "left",
-		truncation_required: truncate_at > 0 && utf8.RuneCountInString(name) > truncate_at,
-		max_length:          utf8.RuneCountInString(name),
+	return Column{
+		Name:               name,
+		truncateAt:         truncateAt,
+		Justification:      "left",
+		truncationRequired: truncateAt > 0 && utf8.RuneCountInString(name) > truncateAt,
+		maxLength:          utf8.RuneCountInString(name),
 	}
 }
 
-type ConsoleTable struct {
-	Columns     []ConsoleTableColumn
+type Table struct {
+	Columns     []Column
 	ColumnCount int
 	Rows        [][]string
 	RowCount    int
 }
 
-func NewConsoleTable(columns []ConsoleTableColumn) ConsoleTable {
-	return ConsoleTable{
+func NewTable(columns []Column) Table {
+	return Table{
 		Columns:     columns,
 		ColumnCount: len(columns),
 		Rows:        [][]string{},
@@ -48,9 +48,9 @@ func NewConsoleTable(columns []ConsoleTableColumn) ConsoleTable {
 	}
 }
 
-func (ct *ConsoleTable) AddRow(fields ...string) {
+func (t *Table) AddRow(fields ...string) {
 
-	if len(fields) != ct.ColumnCount {
+	if len(fields) != t.ColumnCount {
 		log.Fatal("CONSOLETABLE: Cannot add a row of data with more, or fewer, fields than defined columns.")
 	}
 
@@ -60,114 +60,114 @@ func (ct *ConsoleTable) AddRow(fields ...string) {
 	// note: max length is initialized to the column name's length when new column object is instantiated,
 	// as it is essentially a part of the data set when it comes to display logic
 
-	for i := 0; i < ct.ColumnCount; i++ {
-		if ct.Columns[i].max_length < utf8.RuneCountInString(fields[i]) {
-			ct.Columns[i].max_length = utf8.RuneCountInString(fields[i])
+	for i := 0; i < t.ColumnCount; i++ {
+		if t.Columns[i].maxLength < utf8.RuneCountInString(fields[i]) {
+			t.Columns[i].maxLength = utf8.RuneCountInString(fields[i])
 		}
-		if ct.Columns[i].truncate_at > 0 && ct.Columns[i].max_length > ct.Columns[i].truncate_at {
-			ct.Columns[i].truncation_required = true
+		if t.Columns[i].truncateAt > 0 && t.Columns[i].maxLength > t.Columns[i].truncateAt {
+			t.Columns[i].truncationRequired = true
 		}
 	}
 
-	ct.Rows = append(ct.Rows, fields)
+	t.Rows = append(t.Rows, fields)
 }
 
-func (ct *ConsoleTable) Display(show_headers bool) {
+func (t *Table) Display(showHeaders bool) {
 
-	processed_rows := []string{}
+	processedRows := []string{}
 
-	for _, row := range ct.Rows {
+	for _, row := range t.Rows {
 		// for each row
-		row_str := ""
+		rowStr := ""
 
-		for i, col := range ct.Columns {
+		for i, col := range t.Columns {
 			// for each field - build row string including padding for columnar output, justification, and any truncation per column defs
-			field_data := row[i]
+			fieldData := row[i]
 
 			// truncate field value?
-			if col.truncation_required && utf8.RuneCountInString(field_data) > col.truncate_at {
-				field_data = field_data[:col.truncate_at] + "..."
+			if col.truncationRequired && utf8.RuneCountInString(fieldData) > col.truncateAt {
+				fieldData = fieldData[:col.truncateAt] + "..."
 			}
 
 			// create format string that will be used for column width and justification
-			var format_string string
-			var just_code string // used inside format string
+			var formatString string
+			var justCode string // used inside format string
 
 			if col.Justification == "left" {
-				just_code = "%-"
+				justCode = "%-"
 			} else {
-				just_code = "%"
+				justCode = "%"
 			}
 
-			if col.truncation_required {
-				format_string = just_code + strconv.Itoa(col.truncate_at+3) + "v" // +3 for the ... added when truncated
+			if col.truncationRequired {
+				formatString = justCode + strconv.Itoa(col.truncateAt+3) + "v" // +3 for the ... added when truncated
 			} else {
-				format_string = just_code + strconv.Itoa(col.max_length) + "v"
+				formatString = justCode + strconv.Itoa(col.maxLength) + "v"
 			}
 
 			// padding between columns, prepend a space to all but the first column
 			if i == 0 {
-				row_str += fmt.Sprintf(format_string, field_data)
+				rowStr += fmt.Sprintf(formatString, fieldData)
 			} else {
-				row_str += " " + fmt.Sprintf(format_string, field_data)
+				rowStr += " " + fmt.Sprintf(formatString, fieldData)
 			}
 		} // END for each column
 
-		processed_rows = append(processed_rows, row_str)
+		processedRows = append(processedRows, rowStr)
 	} // END for each row
 
-	if show_headers {
-		header_str := ""
-		header_separator := ""
+	if showHeaders {
+		headerStr := ""
+		headerSeparator := ""
 
-		for i := range ct.Columns { // note: this format of 'range' is pointer rather than value, as we need to modify original object
+		for i := range t.Columns { // note: this format of 'range' is pointer rather than value, as we need to modify original object
 
-			col := ct.Columns[i] // <- still pointer format for range, but assigning to var as it was already used throughout
+			col := t.Columns[i] // <- still pointer format for range, but assigning to var as it was already used throughout
 
 			// did we truncate? if so header needs to account for that
-			if col.truncation_required {
+			if col.truncationRequired {
 
 				// padding between columns, prepend space to all but first column
 				if i == 0 {
-					header_separator += strings.Repeat("=", col.truncate_at+3) // +3 to account for the '...'
+					headerSeparator += strings.Repeat("=", col.truncateAt+3) // +3 to account for the '...'
 				} else {
-					header_separator += " " + strings.Repeat("=", col.truncate_at+3) // +3 to account for the '...'
+					headerSeparator += " " + strings.Repeat("=", col.truncateAt+3) // +3 to account for the '...'
 				}
 
 				// truncate column name also?
-				if utf8.RuneCountInString(col.Name) > col.truncate_at {
+				if utf8.RuneCountInString(col.Name) > col.truncateAt {
 					// padding between columns, prepend space to all but first column
 					if i == 0 {
-						header_str += fmt.Sprintf("%-"+strconv.Itoa(col.truncate_at+3)+"v", col.Name[:col.truncate_at]+"...")
+						headerStr += fmt.Sprintf("%-"+strconv.Itoa(col.truncateAt+3)+"v", col.Name[:col.truncateAt]+"...")
 					} else {
-						header_str += " " + fmt.Sprintf("%-"+strconv.Itoa(col.truncate_at+3)+"v", col.Name[:col.truncate_at]+"...")
+						headerStr += " " + fmt.Sprintf("%-"+strconv.Itoa(col.truncateAt+3)+"v", col.Name[:col.truncateAt]+"...")
 					}
 				} else {
 					// padding between columns, prepend a space to all but first column
 					if i == 0 {
-						header_str += fmt.Sprintf("%-"+strconv.Itoa(col.truncate_at+3)+"v", col.Name)
+						headerStr += fmt.Sprintf("%-"+strconv.Itoa(col.truncateAt+3)+"v", col.Name)
 					} else {
-						header_str += " " + fmt.Sprintf("%-"+strconv.Itoa(col.truncate_at+3)+"v", col.Name)
+						headerStr += " " + fmt.Sprintf("%-"+strconv.Itoa(col.truncateAt+3)+"v", col.Name)
 					}
 				}
 
 			} else {
 				// padding between columns, prepend a space to all but the first column
 				if i == 0 {
-					header_str += fmt.Sprintf("%-"+strconv.Itoa(col.max_length)+"v", col.Name)
-					header_separator += strings.Repeat("=", col.max_length)
+					headerStr += fmt.Sprintf("%-"+strconv.Itoa(col.maxLength)+"v", col.Name)
+					headerSeparator += strings.Repeat("=", col.maxLength)
 				} else {
-					header_str += " " + fmt.Sprintf("%-"+strconv.Itoa(col.max_length)+"v", col.Name)
-					header_separator += " " + strings.Repeat("=", col.max_length)
+					headerStr += " " + fmt.Sprintf("%-"+strconv.Itoa(col.maxLength)+"v", col.Name)
+					headerSeparator += " " + strings.Repeat("=", col.maxLength)
 				}
 			}
 		}
 		// output header
-		fmt.Println(header_str)
-		fmt.Println(header_separator)
+		fmt.Println(headerStr)
+		fmt.Println(headerSeparator)
 	}
 
-	for _, r := range processed_rows {
+	for _, r := range processedRows {
 		fmt.Println(r)
 	}
 }
