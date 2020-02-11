@@ -35,7 +35,7 @@ func NewColumn(name string, truncateAt int) Column {
 type Table struct {
 	Columns     []Column
 	ColumnCount int
-	Rows        [][]string
+	Rows        [][]interface{}
 	RowCount    int
 }
 
@@ -43,14 +43,15 @@ func NewTable(columns []Column) Table {
 	return Table{
 		Columns:     columns,
 		ColumnCount: len(columns),
-		Rows:        [][]string{},
+		Rows:        [][]interface{}{},
 		RowCount:    0,
 	}
 }
 
-func (t *Table) AddRow(fields ...string) {
+// New version of AddRow() to support multiline values in fields - original/previous version commented out below this one
+func (ct *Table) AddRow(fields ...interface{}) {
 
-	if len(fields) != t.ColumnCount {
+	if len(fields) != ct.ColumnCount {
 		log.Fatal("CONSOLETABLE: Cannot add a row of data with more, or fewer, fields than defined columns.")
 	}
 
@@ -60,27 +61,99 @@ func (t *Table) AddRow(fields ...string) {
 	// note: max length is initialized to the column name's length when new column object is instantiated,
 	// as it is essentially a part of the data set when it comes to display logic
 
-	for i := 0; i < t.ColumnCount; i++ {
-		if t.Columns[i].maxLength < utf8.RuneCountInString(fields[i]) {
-			t.Columns[i].maxLength = utf8.RuneCountInString(fields[i])
-		}
-		if t.Columns[i].truncateAt > 0 && t.Columns[i].maxLength > t.Columns[i].truncateAt {
-			t.Columns[i].truncationRequired = true
+	rowState := struct {
+		hasMultilineValue     bool
+		multilineFieldIndexes []int
+		currentItemIndexes    map[int]int
+	}{}
+
+	rowState.hasMultilineValue = false
+	rowState.currentItemIndexes = make(map[int]int)
+
+	for i := 0; i < ct.ColumnCount; i++ {
+
+		switch v := fields[i].(type) {
+
+		case string:
+
+			if ct.Columns[i].maxLength < utf8.RuneCountInString(v) {
+				ct.Columns[i].maxLength = utf8.RuneCountInString(v)
+			}
+			if ct.Columns[i].truncateAt > 0 && ct.Columns[i].maxLength > ct.Columns[i].truncateAt {
+				ct.Columns[i].truncationRequired = true
+			}
+
+		case []string:
+
+			rowState.hasMultilineValue = true
+			rowState.multilineFieldIndexes = append(rowState.multilineFieldIndexes, i)
+			rowState.currentItemIndexes[i] = 1 // starting 1 instead of zero because first row will be added normally, then multiline values after
+
+			for _, str := range v {
+
+				if ct.Columns[i].maxLength < utf8.RuneCountInString(str) {
+					ct.Columns[i].maxLength = utf8.RuneCountInString(str)
+				}
+				if ct.Columns[i].truncateAt > 0 && ct.Columns[i].maxLength > ct.Columns[i].truncateAt {
+					ct.Columns[i].truncationRequired = true
+				}
+			}
+
+		default:
+			log.Fatal("CONSOLETABLE: You can add only string or []string types as individual fields to AddRow().")
 		}
 	}
 
-	t.Rows = append(t.Rows, fields)
+	//	for i := 0; i < ct.ColumnCount; i++ {
+	//		if ct.Columns[i].maxLength < utf8.RuneCountInString(fields[i].(string)) {
+	//			ct.Columns[i].maxLength = utf8.RuneCountInString(fields[i].(string))
+	//		}
+	//		if ct.Columns[i].truncateAt > 0 && ct.Columns[i].maxLength > ct.Columns[i].truncateAt {
+	//			ct.Columns[i].truncationRequired = true
+	//		}
+	//	}
+
+	if !rowState.hasMultilineValue {
+		// add as normal, each field is an interface{} that's value IS a single string
+		ct.Rows = append(ct.Rows, fields)
+	} else {
+		// deal with multiline fields
+	}
 }
 
-func (t *Table) Display(showHeaders bool) {
+//func (t *Table) AddRow(fields ...string) {
+//
+//	if len(fields) != ct.ColumnCount {
+//		log.Fatal("CONSOLETABLE: Cannot add a row of data with more, or fewer, fields than defined columns.")
+//	}
+//
+//	// update max length values and truncation status stored with column defs.
+//	// whether truncation *will* be required is stored with the column def so it can be used in display logic,
+//	// but we only truncate upon display so we keep all the data
+//	// note: max length is initialized to the column name's length when new column object is instantiated,
+//	// as it is essentially a part of the data set when it comes to display logic
+//
+//	for i := 0; i < ct.ColumnCount; i++ {
+//		if ct.Columns[i].maxLength < utf8.RuneCountInString(fields[i]) {
+//			ct.Columns[i].maxLength = utf8.RuneCountInString(fields[i])
+//		}
+//		if ct.Columns[i].truncateAt > 0 && ct.Columns[i].maxLength > ct.Columns[i].truncateAt {
+//			ct.Columns[i].truncationRequired = true
+//		}
+//	}
+//
+//	ct.Rows = append(ct.Rows, fields)
+//}
+
+func (ct *Table) Display(showHeaders bool) {
 
 	processedRows := []string{}
 
-	for _, row := range t.Rows {
+	for _, row := range ct.Rows {
 		// for each row
 		rowStr := ""
 
-		for i, col := range t.Columns {
+		for i, col := range ct.Columns {
 			// for each field - build row string including padding for columnar output, justification, and any truncation per column defs
 			fieldData := row[i]
 
@@ -120,9 +193,9 @@ func (t *Table) Display(showHeaders bool) {
 		headerStr := ""
 		headerSeparator := ""
 
-		for i := range t.Columns { // note: this format of 'range' is pointer rather than value, as we need to modify original object
+		for i := range ct.Columns { // note: this format of 'range' is pointer rather than value, as we need to modify original object
 
-			col := t.Columns[i] // <- still pointer format for range, but assigning to var as it was already used throughout
+			col := ct.Columns[i] // <- still pointer format for range, but assigning to var as it was already used throughout
 
 			// did we truncate? if so header needs to account for that
 			if col.truncationRequired {
