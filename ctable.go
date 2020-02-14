@@ -167,8 +167,14 @@ func (ct *Table) AddRow(fields ...interface{}) {
 					if !isMLField {
 						tempFields = append(tempFields, "") // blanks in cells/fields next to cells/fields with multilines after first value is displayed with the rest of the non multiline value row
 					} else {
-						tempFields = append(tempFields, fields[fi].([]string)[x])
-						rowState.mlTracker[fi]++ // keeping track of which item in the multiline list has been handled and which is up next
+						// there can be multiple multiline fields with varying lengths, only add/write if there are more values for THIS field (or we'll blow an index bounds)
+						if len(fields[fi].([]string)) > rowState.mlTracker[fi] {
+							tempFields = append(tempFields, fields[fi].([]string)[rowState.mlTracker[fi]])
+							rowState.mlTracker[fi]++ // keeping track of which item in the multiline list has been handled and which is up next
+						} else {
+							// this field is done but others may still have more to go, add the blank - total iterations controlled by length of *longest* multiline field of the row, has to be
+							tempFields = append(tempFields, "")
+						}
 					}
 				}
 			}
@@ -210,7 +216,6 @@ func (ct *Table) Display(showHeaders bool) {
 	for _, row := range ct.Rows {
 		// for each row
 		rowStr := ""
-
 		for i, col := range ct.Columns {
 			// for each field - build row string including padding for columnar output, justification, and any truncation per column defs
 			fieldData := row[i].(string) // to support multiline values, interfaces were used, at this point each field item should be a single string
